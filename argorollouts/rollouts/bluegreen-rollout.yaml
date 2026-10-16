@@ -1,0 +1,75 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: release-demo-bluegreen
+  namespace: progressive-delivery
+  labels:
+    app.kubernetes.io/name: release-demo-app
+    strategy: blue-green
+spec:
+  replicas: 3
+  revisionHistoryLimit: 5
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: release-demo-app
+  strategy:
+    blueGreen:
+      activeService: release-demo-active
+      previewService: release-demo-preview
+      autoPromotionEnabled: false
+      scaleDownDelaySeconds: 45
+      # Pre-promotion analysis validates the preview pods before active traffic switch
+      prePromotionAnalysis:
+        templates:
+          - templateName: prometheus-rate-and-latency
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: release-demo-app
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: release-demo-sa
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+      containers:
+        - name: release-demo-app
+          image: release-demo-app:v1.0.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8000
+              protocol: TCP
+          env:
+            - name: APP_ENV
+              value: "production"
+            - name: SIMULATION_ENABLED
+              value: "true"
+            - name: SIMULATION_AUTH_TOKEN
+              value: "devops-testing-secret-token"
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "300m"
+              memory: "256Mi"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 2

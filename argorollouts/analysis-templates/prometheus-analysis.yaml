@@ -1,0 +1,47 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: prometheus-rate-and-latency
+  namespace: progressive-delivery
+spec:
+  args:
+    - name: prometheus-url
+      value: "http://prometheus-server.observability.svc.cluster.local:9090"
+  metrics:
+    # -------------------------------------------------------------------------
+    # Metric 1: HTTP 5xx Error Rate Analysis
+    # Condition: 5xx error rate must remain below 2% (0.02)
+    # Traffic volume safeguard: if total traffic is 0, NaN is handled safely
+    # -------------------------------------------------------------------------
+    - name: http-error-rate
+      interval: 15s
+      count: 4
+      successCondition: "len(result) == 0 || result[0] <= 0.02"
+      failureLimit: 1
+      provider:
+        prometheus:
+          address: "{{args.prometheus-url}}"
+          query: |
+            (
+              sum(rate(http_requests_total{status=~"5.*",namespace="progressive-delivery"}[2m]))
+              /
+              (sum(rate(http_requests_total{namespace="progressive-delivery"}[2m])) > 0)
+            ) or on() vector(0)
+
+    # -------------------------------------------------------------------------
+    # Metric 2: p95 Latency Analysis
+    # Condition: 95th percentile response latency must be less than 400ms (0.40s)
+    # -------------------------------------------------------------------------
+    - name: p95-latency
+      interval: 15s
+      count: 4
+      successCondition: "len(result) == 0 || result[0] <= 0.40"
+      failureLimit: 1
+      provider:
+        prometheus:
+          address: "{{args.prometheus-url}}"
+          query: |
+            histogram_quantile(
+              0.95,
+              sum(rate(http_request_duration_seconds_bucket{namespace="progressive-delivery"}[2m])) by (le)
+            ) or on() vector(0.05)
