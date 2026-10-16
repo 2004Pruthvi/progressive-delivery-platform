@@ -1,0 +1,39 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: release-demo-alerts
+  namespace: observability
+  labels:
+    role: alert-rules
+spec:
+  groups:
+    - name: progressive-delivery-alerts
+      rules:
+        - alert: CanaryHighErrorRate
+          expr: |
+            (
+              sum(rate(http_requests_total{status=~"5.*",namespace="progressive-delivery"}[1m]))
+              /
+              sum(rate(http_requests_total{namespace="progressive-delivery"}[1m]))
+            ) > 0.02
+          for: 30s
+          labels:
+            severity: critical
+            tier: deployment
+          annotations:
+            summary: "Canary release experiencing elevated HTTP 5xx error rate (>2%)"
+            description: "Current error rate is {{ $value | humanizePercentage }}. Argo Rollouts automated rollback should trigger."
+
+        - alert: CanaryHighP95Latency
+          expr: |
+            histogram_quantile(
+              0.95,
+              sum(rate(http_request_duration_seconds_bucket{namespace="progressive-delivery"}[1m])) by (le)
+            ) > 0.400
+          for: 30s
+          labels:
+            severity: warning
+            tier: deployment
+          annotations:
+            summary: "Canary release p95 latency exceeds 400ms SLO threshold"
+            description: "Current p95 latency is {{ $value }}s."
