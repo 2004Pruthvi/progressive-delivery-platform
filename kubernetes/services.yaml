@@ -1,0 +1,77 @@
+# =============================================================================
+# Canary Deployment Services
+# =============================================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: release-demo-stable
+  namespace: progressive-delivery
+  labels:
+    app.kubernetes.io/name: release-demo-app
+    role: stable
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8000
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: release-demo-app
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: release-demo-canary
+  namespace: progressive-delivery
+  labels:
+    app.kubernetes.io/name: release-demo-app
+    role: canary
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8000
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: release-demo-app
+---
+# =============================================================================
+# Blue-Green Deployment Services
+# =============================================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: release-demo-active
+  namespace: progressive-delivery
+  labels:
+    app.kubernetes.io/name: release-demo-app
+    role: active
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8000
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: release-demo-app
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: release-demo-preview
+  namespace: progressive-delivery
+  labels:
+    app.kubernetes.io/name: release-demo-app
+    role: preview
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8000
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: release-demo-app
